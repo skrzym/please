@@ -1,5 +1,4 @@
-from please import __version__
-
+import please
 
 def test_version():
-    assert __version__ == "0.3.1"
+    assert please.__version__ == "0.3.1"

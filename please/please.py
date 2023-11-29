@@ -7,6 +7,7 @@ import shutil
 from os.path import expanduser
 
 import typer
+from typing_extensions import Annotated
 from rich.align import Align
 from rich.console import Console
 from rich.markdown import Markdown
@@ -42,6 +43,27 @@ def write_config(data: dict) -> None:
         of.write(json.dumps(data, indent=2))
 
 
+def check_for_completed_tasks_file() -> None:
+    if not os.path.exists(os.path.join(config_path, "completed_tasks.json")):
+        with open(os.path.join(config_path, "completed_tasks.json"), "w") as of:
+            of.write("[]")
+
+
+def read_completed_tasks() -> dict:
+    check_for_completed_tasks_file()
+    with open(os.path.join(config_path, "completed_tasks.json"), "r") as of:
+        existing_data = json.load(of)
+    return existing_data
+
+
+def write_completed_tasks(data: dict) -> None:
+    check_for_completed_tasks_file()
+    existing_data = read_completed_tasks()
+    existing_data.extend(data)
+    with open(os.path.join(config_path, "completed_tasks.json"), "w") as of:
+        of.write(json.dumps(existing_data, indent=2))
+
+
 def all_tasks_done() -> bool:
     return all(task["done"] for task in config["tasks"])
 
@@ -61,6 +83,7 @@ def add(task: str) -> None:
     center_print(f'Added "{task}" to the list', COLOR_SUCCESS)
     print_tasks()
 
+
 @app.command(short_help="Show once a day")
 def daily(ctx: typer.Context) -> None:
     try:
@@ -74,6 +97,7 @@ def daily(ctx: typer.Context) -> None:
         config["last_reminder"] = datetime.date.today().strftime("%d-%m-%Y")
         write_config(config)
         show(ctx)
+
 
 @app.command(short_help="Deletes a Task")
 def delete(index: int) -> None:
@@ -186,6 +210,7 @@ def move(old_index: int, new_index: int):
             "Please check the entered index values", COLOR_WARNING
         )
 
+
 @app.command(short_help="Edit task name")
 def edit(index: int, new_name: str) -> None:
     if not 0 <= index - 1 < len(config["tasks"]):
@@ -222,16 +247,21 @@ def edit(index: int, new_name: str) -> None:
             "Please check the entered Task index and new Task name", COLOR_WARNING
         )
 
+
 @app.command(short_help="Clean up tasks marked as done from the task list")
 def clean() -> None:
     res = []
+    completed = []
     for i in config['tasks']:
         if i['done'] != True:
             res.append(i)
+        else:
+            completed.append(i)
     if config['tasks'] != res:
         config['tasks'] = res
         write_config(config)
-        center_print("Updated Task List", COLOR_SUCCESS)
+        write_completed_tasks(completed)
+        center_print(f"Updated Task List. Archived {len(completed)} tasks.", COLOR_SUCCESS)
         print_tasks(config["tasks"])
         return
     center_print("No Updates Made", COLOR_INFO)
@@ -252,6 +282,7 @@ def changetimeformat() -> None:
     except:
         config["time_format_24h"] = False
     write_config(config)
+
 
 @app.command(short_help="Set a custom file to fetch quotes")
 def changequotes(quotes_file: str) -> None:
@@ -330,6 +361,30 @@ def showtasks() -> None:
         center_print("[#61E294]Looking good, no pending tasks 😁[/]")
 
 
+@app.command(short_help="Show all completed tasks")
+def showcompleted() -> None:
+    completed_tasks = read_completed_tasks()
+    table1 = Table(
+        title="Completed Tasks",
+        title_style="grey39",
+        header_style="#e85d04",
+        style="#e85d04 bold",
+    )
+    table1.add_column("Number", style="#e85d04")
+    table1.add_column("Task")
+    table1.add_column("Status")
+
+    if len(completed_tasks) == 0:
+        center_print(table1)
+    else:
+        for index, task in enumerate(completed_tasks):
+            task_name = f"[#A0FF55] {task['name']}[/]"
+            task_status = f'{config.get("done_icon", "✅")}'
+            task_index = f"[#A0FF55] {str(index + 1)} [/]"
+            table1.add_row(task_index, task_name, task_status)
+        center_print(table1)
+
+
 def print_tasks(forced_print: bool = False) -> None:
     if not all_tasks_done() or forced_print:
         showtasks()
@@ -373,10 +428,12 @@ def setup() -> None:
 
     config["initial_setup_done"] = True
     config["tasks"] = []
-    config["disable_line"] = False
-    config["disable_quotes"] = False
-    config["disable_greeting"] = False
-    config["time_format_24h"] = False
+    config["options"] = {
+        "line": True,
+        "quotes": True,
+        "greeting": True,
+        "24h_time_format": False,
+    }
     config["last_reminder"] = None
     config["done_icon"] = "✅"
     config["notdone_icon"] = "❌"
@@ -393,32 +450,32 @@ def show(ctx: typer.Context) -> None:
     if ctx.invoked_subcommand is None:
         date_text = ""
 
-        if "disable_greeting" in config.keys() and config["disable_greeting"] == True:
+        if "greeting" in config['options'].keys() and config['options']["greeting"] == False:
             pass
         else:
-            config["disable_greeting"] = False
+            config['options']["greeting"] = True
             write_config(config)
             try:
-                if config["time_format_24h"] is (None or False):
+                if config['options']["24h_time_format"] is (None or False):
                     date_text = f"[#FFBF00] Hello {user_name}! It's {date_now.strftime('%d %b | %I:%M %p')}[/]"
                 else:
                     date_text = f"[#FFBF00] Hello {user_name}! It's {date_now.strftime('%d %b | %H:%M')}[/]"
             except:
-                config["time_format_24h"] = True
+                config['options']["24h_time_format"] = False
                 write_config(config)
                 date_text = f"[#FFBF00] Hello {user_name}! It's {date_now.strftime('%d %b | %I:%M %p')}[/]"
 
-        if "disable_line" in config.keys() and config["disable_line"] == True:
+        if "line" in config['options'].keys() and config['options']["line"] == False:
             center_print(date_text)
         else:
-            config["disable_line"] = False
+            config['options']["line"] = True
             write_config(config)
             console.rule(date_text, align="center", style="#FFBF00")
 
-        if "disable_quotes" in config.keys() and config["disable_quotes"] == True:
+        if "quotes" in config['options'].keys() and config['options']["quotes"] == False:
             pass
         else:
-            config["disable_quotes"] = False
+            config['options']["quotes"] = True
             write_config(config)
             quote = getquotes()
             center_print(f'[#63D2FF]"{quote["content"]}"[/]', wrap=True)
@@ -426,6 +483,25 @@ def show(ctx: typer.Context) -> None:
                 f'[#F03A47][i]- {quote["author"]}[/i][/]\n', wrap=True)
 
         print_tasks()
+
+
+@app.command(short_help="Disable/Enable various settings")
+def toggle(name: str) -> None:
+    options = ["line", "quotes", "greeting", "24h_time_format"]
+    if name not in options:
+        center_print(
+            f"Invalid option. Valid options are {options}", COLOR_ERROR)
+        return
+    try:
+        if config['options'][name] is (None or False):
+            config['options'][name] = True
+            center_print(f"Enabled {name}", COLOR_SUCCESS)
+        else:
+            config['options'][name] = False
+            center_print(f"Disabled {name}", COLOR_SUCCESS)
+    except:
+        config['options'][name] = True
+    write_config(config)
 
 
 def main() -> None:
