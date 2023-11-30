@@ -433,6 +433,7 @@ def setup() -> None:
         "quotes": True,
         "greeting": True,
         "24h_time_format": False,
+        "clear_console": False,
     }
     config["last_reminder"] = None
     config["done_icon"] = "✅"
@@ -448,6 +449,12 @@ def show(ctx: typer.Context) -> None:
     user_name = config["user_name"]
 
     if ctx.invoked_subcommand is None:
+        if "clear_console" in config['options'].keys() and config['options']["clear_console"] == True:
+            console.clear()
+        else:
+            config['options']["clear_console"] = False
+            write_config(config)
+        
         date_text = ""
 
         if "greeting" in config['options'].keys() and config['options']["greeting"] == False:
@@ -487,7 +494,7 @@ def show(ctx: typer.Context) -> None:
 
 @app.command(short_help="Disable/Enable various settings")
 def toggle(name: str) -> None:
-    options = ["line", "quotes", "greeting", "24h_time_format"]
+    options = ["line", "quotes", "greeting", "24h_time_format", "clear_console"]
     if name not in options:
         center_print(
             f"Invalid option. Valid options are {options}", COLOR_ERROR)
