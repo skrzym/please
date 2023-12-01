@@ -84,21 +84,6 @@ def add(task: str) -> None:
     print_tasks()
 
 
-@app.command(short_help="Show once a day")
-def daily(ctx: typer.Context) -> None:
-    try:
-        if config["last_reminder"] == datetime.date.today().strftime("%d-%m-%Y"):
-            pass
-        else:
-            config["last_reminder"] = datetime.date.today().strftime("%d-%m-%Y")
-            write_config(config)
-            show(ctx)
-    except:
-        config["last_reminder"] = datetime.date.today().strftime("%d-%m-%Y")
-        write_config(config)
-        show(ctx)
-
-
 @app.command(short_help="Deletes a Task")
 def delete(index: int) -> None:
     index = index - 1
@@ -435,7 +420,6 @@ def setup() -> None:
         "24h_time_format": False,
         "clear_console": False,
     }
-    config["last_reminder"] = None
     config["done_icon"] = "✅"
     config["notdone_icon"] = "❌"
     config["quotes_file"] = os.path.join(__location__, "quotes.json")
