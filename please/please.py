@@ -84,21 +84,6 @@ def add(task: str) -> None:
     print_tasks()
 
 
-@app.command(short_help="Show once a day")
-def daily(ctx: typer.Context) -> None:
-    try:
-        if config["last_reminder"] == datetime.date.today().strftime("%d-%m-%Y"):
-            pass
-        else:
-            config["last_reminder"] = datetime.date.today().strftime("%d-%m-%Y")
-            write_config(config)
-            show(ctx)
-    except:
-        config["last_reminder"] = datetime.date.today().strftime("%d-%m-%Y")
-        write_config(config)
-        show(ctx)
-
-
 @app.command(short_help="Deletes a Task")
 def delete(index: int) -> None:
     index = index - 1
@@ -268,22 +253,6 @@ def clean() -> None:
     print_tasks(config["tasks"])
 
 
-@app.command(short_help="Toggle Time Format from 24 Hours to 12 Hours")
-def changetimeformat() -> None:
-    try:
-        if config["time_format_24h"] is (None or False):
-            config["time_format_24h"] = True
-            center_print("Changed Time Format from 12h to 24h",
-                         COLOR_SUCCESS)
-        else:
-            config["time_format_24h"] = False
-            center_print("Changed Time Format from 24h to 12h",
-                         COLOR_SUCCESS)
-    except:
-        config["time_format_24h"] = False
-    write_config(config)
-
-
 @app.command(short_help="Set a custom file to fetch quotes")
 def changequotes(quotes_file: str) -> None:
     #Check if file exists and it is a valid JSON
@@ -435,7 +404,6 @@ def setup() -> None:
         "24h_time_format": False,
         "clear_console": False,
     }
-    config["last_reminder"] = None
     config["done_icon"] = "✅"
     config["notdone_icon"] = "❌"
     config["quotes_file"] = os.path.join(__location__, "quotes.json")
