@@ -8,6 +8,7 @@ from os.path import expanduser
 
 import typer
 from typing_extensions import Annotated
+from typing import Optional
 from rich.align import Align
 from rich.console import Console
 from rich.markdown import Markdown
@@ -297,9 +298,8 @@ def changequotes(quotes_file: str) -> None:
         )
 
 
-@app.command(short_help="Show all Tasks")
-def showtasks() -> None:
-    task_num = config["tasks"]
+def print_tasks(status:str = '') -> None:
+    tasks = config["tasks"]
     table1 = Table(
         title="Tasks",
         title_style="grey39",
@@ -310,28 +310,32 @@ def showtasks() -> None:
     table1.add_column("Task")
     table1.add_column("Status")
 
-    if len(task_num) == 0:
-        center_print(table1)
+    if status == 'completed':
+        task_list = [task for task in tasks if task['done'] == True]
+    elif status == 'pending':
+        task_list = [task for task in tasks if task['done'] == False]
     else:
-        for index, task in enumerate(task_num):
-            if task["done"]:
-                task_name = f"[#A0FF55] {task['name']}[/]"
-                task_status = f'{config.get("done_icon", "✅")}'
-                task_index = f"[#A0FF55] {str(index + 1)} [/]"
-            else:
-                task_name = f"[#FF5555] {task['name']}[/]"
-                task_status = f'{config.get("notdone_icon", "❌")}'
-                task_index = f"[#FF5555] {str(index + 1)} [/]"
+        task_list = tasks.copy()
 
-            table1.add_row(task_index, task_name, task_status)
+    for index, task in enumerate(task_list):
+        if task["done"]:
+            task_name = f"[#A0FF55] {task['name']}[/]"
+            task_status = f'{config.get("done_icon", "✅")}'
+            task_index = f"[#A0FF55] {str(index + 1)} [/]"
+        else:
+            task_name = f"[#FF5555] {task['name']}[/]"
+            task_status = f'{config.get("notdone_icon", "❌")}'
+            task_index = f"[#FF5555] {str(index + 1)} [/]"
+
+        table1.add_row(task_index, task_name, task_status)
+    
+    if table1.row_count == 0:
+        center_print("No tasks to show", COLOR_INFO)
+    else:
         center_print(table1)
 
-    if(all_tasks_done()):
-        center_print("[#61E294]Looking good, no pending tasks 😁[/]")
 
-
-@app.command(short_help="Show all completed tasks")
-def showcompleted() -> None:
+def showarchive() -> None:
     completed_tasks = read_completed_tasks()
     table1 = Table(
         title="Completed Tasks",
@@ -352,13 +356,6 @@ def showcompleted() -> None:
             task_index = f"[#A0FF55] {str(index + 1)} [/]"
             table1.add_row(task_index, task_name, task_status)
         center_print(table1)
-
-
-def print_tasks(forced_print: bool = False) -> None:
-    if not all_tasks_done() or forced_print:
-        showtasks()
-    else:
-        center_print("[#61E294]Looking good, no pending tasks 😁[/]")
 
 
 def getquotes() -> dict:
@@ -411,52 +408,80 @@ def setup() -> None:
 
 
 @app.callback(invoke_without_command=True)
-def show(ctx: typer.Context) -> None:
-    """Greets the user."""
+def base(ctx: typer.Context) -> None:
+    if ctx.invoked_subcommand is None:
+        show()
+
+
+def display_header() -> None:
+    if "clear_console" in config['options'].keys() and config['options']["clear_console"] == True:
+        console.clear()
+    else:
+        config['options']["clear_console"] = False
+        write_config(config)
+    
     date_now = datetime.datetime.now()
     user_name = config["user_name"]
+    
+    date_text = ""
 
-    if ctx.invoked_subcommand is None:
-        if "clear_console" in config['options'].keys() and config['options']["clear_console"] == True:
-            console.clear()
-        else:
-            config['options']["clear_console"] = False
-            write_config(config)
-        
-        date_text = ""
-
-        if "greeting" in config['options'].keys() and config['options']["greeting"] == False:
-            pass
-        else:
-            config['options']["greeting"] = True
-            write_config(config)
-            try:
-                if config['options']["24h_time_format"] is (None or False):
-                    date_text = f"[#FFBF00] Hello {user_name}! It's {date_now.strftime('%d %b | %I:%M %p')}[/]"
-                else:
-                    date_text = f"[#FFBF00] Hello {user_name}! It's {date_now.strftime('%d %b | %H:%M')}[/]"
-            except:
-                config['options']["24h_time_format"] = False
-                write_config(config)
+    if "greeting" in config['options'].keys() and config['options']["greeting"] == False:
+        pass
+    else:
+        config['options']["greeting"] = True
+        write_config(config)
+        try:
+            if config['options']["24h_time_format"] is (None or False):
                 date_text = f"[#FFBF00] Hello {user_name}! It's {date_now.strftime('%d %b | %I:%M %p')}[/]"
-
-        if "line" in config['options'].keys() and config['options']["line"] == False:
-            center_print(date_text)
-        else:
-            config['options']["line"] = True
+            else:
+                date_text = f"[#FFBF00] Hello {user_name}! It's {date_now.strftime('%d %b | %H:%M')}[/]"
+        except:
+            config['options']["24h_time_format"] = False
             write_config(config)
-            console.rule(date_text, align="center", style="#FFBF00")
+            date_text = f"[#FFBF00] Hello {user_name}! It's {date_now.strftime('%d %b | %I:%M %p')}[/]"
 
-        if "quotes" in config['options'].keys() and config['options']["quotes"] == False:
-            pass
+    if "line" in config['options'].keys() and config['options']["line"] == False:
+        center_print(date_text)
+    else:
+        config['options']["line"] = True
+        write_config(config)
+        console.rule(date_text, align="center", style="#FFBF00")
+
+    if "quotes" in config['options'].keys() and config['options']["quotes"] == False:
+        pass
+    else:
+        config['options']["quotes"] = True
+        write_config(config)
+        quote = getquotes()
+        center_print(f'[#63D2FF]"{quote["content"]}"[/]', wrap=True)
+        center_print(
+            f'[#F03A47][i]- {quote["author"]}[/i][/]\n', wrap=True)
+
+
+@app.command(short_help="Chose what to show")
+def show(
+        thing: Optional[str] = typer.Argument(default=''), 
+        completed:bool  = None, 
+        pending:bool    = None, 
+        archived:bool   = None
+    ) -> None:
+    if thing == '':
+        center_print("Please enter a valid option: ['tasks']", COLOR_INFO)
+    elif thing == 'tasks':
+        display_header()
+        if completed:
+            print_tasks(status='completed')
+        elif pending:
+            print_tasks(status='pending')
+        elif archived:
+            showarchive()
         else:
-            config['options']["quotes"] = True
-            write_config(config)
-            quote = getquotes()
-            center_print(f'[#63D2FF]"{quote["content"]}"[/]', wrap=True)
-            center_print(
-                f'[#F03A47][i]- {quote["author"]}[/i][/]\n', wrap=True)
-
+            print_tasks()
+    elif type(thing) == str:
+        display_header()
+        center_print(f'{thing} -> Not implemented yet. Valid options are ["tasks"]', COLOR_ERROR)
+    else: #if what got passed is not a string and doesn't match any of the above
+        display_header()
         print_tasks()
 
 
